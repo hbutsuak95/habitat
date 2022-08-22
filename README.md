@@ -36,10 +36,9 @@
 
     PS: make sure to download the data required for the task you want to use to collect data. 
 
-    - Scene/Environment specific 
+    - Scene/Environment Specific
     ```bash
     
-    python examples/shortest_path_follower_task.py --config <path to config file for the task> --out_dir <directory to store data> --num_episodes <# episodes to collect>
+    python examples/shortest_path_follower_scene.py --scene_id <path to scene/glb file> --out_dir <directory to store data> --num_episodes <# episodes to collect> --max_steps <max steps allowed per episode>
     ```
 
-    
