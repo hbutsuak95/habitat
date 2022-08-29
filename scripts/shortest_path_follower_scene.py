@@ -2,11 +2,10 @@ import math
 import os
 import random
 import sys
+import json
 
 import cv2 
-import git
 import imageio
-import magnum as mn
 import numpy as np
 import argparse
 import tqdm 
@@ -37,7 +36,7 @@ def get_args():
     	help="specify glb file ")
     parser.add_argument(
         "--out_dir",
-        default=os.path.join("data_collection", "shortest_path_scene"),
+        default=os.path.join("data", "shortest_path_scene"),
         help="output directory to store recorded data ",
     )
     parser.add_argument(
@@ -55,27 +54,29 @@ def get_args():
     return args
 
 
-args = get_args()
 
+def simulator_settings(rgb_sensor=True, depth_sensor=True):
 
-
-rgb_sensor = True  # @param {type:"boolean"}
-depth_sensor = True  # @param {type:"boolean"}
-
-sim_settings = {
-    "width": 256,  # Spatial resolution of the observations
-    "height": 256,
-    "scene": args.scene_id,  # Scene path
-    "default_agent": 0,
-    "sensor_height": 0.5,  # Height of sensors in meters
-    "color_sensor": rgb_sensor,  # RGB sensor
-    "depth_sensor": depth_sensor,  # Depth sensor
-    "seed": 1,  # used in the random navigation
-    "enable_physics": False,  # kinematics only
-}
-
+    sim_settings = {
+        "width": 256,  # Spatial resolution of the observations
+        "height": 256,
+        "scene": args.scene_id,  # Scene path
+        "default_agent": 0,
+        "sensor_height": 0.5,  # Height of sensors in meters
+        "color_sensor": rgb_sensor,  # RGB sensor
+        "depth_sensor": depth_sensor,  # Depth sensor
+        "seed": 1,  # used in the random navigation
+        "enable_physics": False,  # kinematics only
+    }
+    return sim_settings
 
 def make_cfg(settings):
+    '''
+    Setting up configuration to initialize the simulator and the agent. Adding sensors, specifying action space etc. 
+
+    Returns:
+        cfg: Configuration for both agent and simulator
+    '''
     sim_cfg = habitat_sim.SimulatorConfiguration()
     sim_cfg.gpu_device_id = 0
     sim_cfg.scene_id = settings["scene"]
@@ -115,71 +116,109 @@ def make_cfg(settings):
         ),
     }
     
-    return habitat_sim.Configuration(sim_cfg, [agent_cfg])
+    cfg = habitat_sim.Configuration(sim_cfg, [agent_cfg])
 
-
-
-cfg = make_cfg(sim_settings)
-# Needed to handle out of order cell run in Colab
-try:  # Got to make initialization idiot proof
-    sim.close()
-except NameError:
-    pass
-sim = habitat_sim.Simulator(cfg)
-
+    return cfg
 
 
 
 def euler_to_quaternion(yaw, pitch, roll):
+    '''
+        Converts Euler angles representation to Quaternion 
+    '''
+    qx = np.sin(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) - np.cos(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
+    qy = np.cos(roll/2) * np.sin(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.cos(pitch/2) * np.sin(yaw/2)
+    qz = np.cos(roll/2) * np.cos(pitch/2) * np.sin(yaw/2) - np.sin(roll/2) * np.sin(pitch/2) * np.cos(yaw/2)
+    qw = np.cos(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
 
-        qx = np.sin(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) - np.cos(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
-        qy = np.cos(roll/2) * np.sin(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.cos(pitch/2) * np.sin(yaw/2)
-        qz = np.cos(roll/2) * np.cos(pitch/2) * np.sin(yaw/2) - np.sin(roll/2) * np.sin(pitch/2) * np.cos(yaw/2)
-        qw = np.cos(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
-
-        return [qx, qy, qz, qw]
-
-
-
-agent = sim.initialize_agent(sim_settings["default_agent"])
-follower = GreedyGeodesicFollower(sim.pathfinder, agent, goal_radius=0.25)
+    return [qx, qy, qz, qw]
 
 
-sim.seed(sim_settings["seed"])
-random.seed(sim_settings["seed"])
-for episode in tqdm.tqdm(range(args.num_episodes)):
-    sim.reset()
-    start_state = habitat_sim.AgentState()
-    goal_state = habitat_sim.AgentState()
-    
-    # Sample Random navigable points as start and goal states 
-    start_state.position = sim.pathfinder.get_random_navigable_point()
-    goal_state.position = sim.pathfinder.get_random_navigable_point()
-    
-    # Randomly sample the rotations for start and goal states
-    start_state.rotation = euler_to_quaternion(0, random.randint(0,360), 0)
-    # goal_state.rotation = R.random().as_quat() # Not being used right now. 
-    
-    # Set the agent start state
+def get_step_dict(step, best_action, agent_state):
+    step_dict = {}
+    position, rot = agent_state.position, agent_state.rotation
+    step_dict["time"] = step; step_dict["action"] = best_action
+    step_dict["reward"] = 0; step_dict["done"] = 0; step_dict["state"] = {"position": position.tolist(),\
+     "rotation": [rot.x, rot.y, rot.z, rot.w]}
+    return step_dict 
+
+def save_json(dict_, filename):
+    with open(filename, "w") as f:
+        json.dump(dict_, f, indent=4) 
+
+
+def collect_data(args, out_dir, seed=42):
+    # Simulator specifications 
+    sim_settings = simulator_settings()
+
+    # setting up the simulator 
+    cfg = make_cfg(sim_settings)
+    sim = habitat_sim.Simulator(cfg)
+
+    # Initializing agent and the greedy Geodesic follower policy 
     agent = sim.initialize_agent(sim_settings["default_agent"])
-    agent.set_state(start_state)
-    
-    # Creating directories 
-    try:
-        os.system("mkdir -p %s"%os.path.join(args.out_dir, args.scene_id.split("/")[-1][:-4], "%03d"%episode, "images"))
-    except:
-        pass
-    
-    step = 0 
-    images, actions = [], []
-    while step < args.max_steps:
-        best_action = follower.next_action_along(goal_state.position)
-        if best_action is None:
-            break
-        obs = sim.step(best_action) 
-        im = obs["color_sensor"]
-        actions.append(best_action)
-        cv2.imwrite(os.path.join(args.out_dir, args.scene_id.split("/")[-1][:-4], "%03d"%episode, "images", "%03d.png"%step), im)
-        step+=1
-    np.save(os.path.join(args.out_dir, args.scene_id.split("/")[-1][:-4], "%03d"%episode, "greedy_geodesic_follower_actions.npy"), np.array(actions))
+    follower = GreedyGeodesicFollower(sim.pathfinder, agent, goal_radius=0.25)
+
+    sim.seed(seed)
+    random.seed(seed)
+
+    action_space = [None] + list(cfg.agents[0].action_space.keys())
+
+    for episode in tqdm.tqdm(range(args.num_episodes)):
+        # Reset the environment 
+        obs = sim.reset()
+        start_state = habitat_sim.AgentState()
+        goal_state = habitat_sim.AgentState()
         
+        # Sample Random navigable points as start and goal states 
+        start_state.position = sim.pathfinder.get_random_navigable_point()
+        goal_state.position = sim.pathfinder.get_random_navigable_point()
+        
+        # Randomly sample the rotations for start and goal states
+        start_state.rotation = euler_to_quaternion(0, random.randint(0,360), 0)
+        # goal_state.rotation = R.random().as_quat() # Not being used right now. 
+        
+        # Set the agent start state
+        agent = sim.initialize_agent(sim_settings["default_agent"])
+        agent.set_state(start_state)
+        
+        # Creating directories 
+        try:
+            os.system("mkdir -p %s"%os.path.join(out_dir, "traj_%d"%episode, "images"))
+            os.system("mkdir -p %s"%os.path.join(out_dir, "traj_%d"%episode, "meta"))
+        except:
+            pass
+        
+        step = 0
+        while step < args.max_steps:
+            img_path = os.path.join(out_dir, "traj_%d"%episode, "images", "%d.png"%step)
+            os.path.join(out_dir, "traj_%d"%episode, "meta", "%d.json"%step)
+            im = obs["color_sensor"]
+            cv2.imwrite(img_path, im)
+
+            agent_state = agent.get_state()
+            best_action = follower.next_action_along(goal_state.position)
+            step_dict = get_step_dict(step, action_space.index(best_action), agent_state)
+            save_json(step_dict, os.path.join(out_dir, "traj_%d"%episode, "meta", "%d.json"%step))
+            if best_action is None:
+                break
+            obs = sim.step(best_action) 
+            step+=1
+        # Save the last point in the trajectory as last step data and goal image
+        im = obs["color_sensor"]
+        agent_state = agent.get_state()
+        cv2.imwrite(os.path.join(out_dir, "traj_%d"%episode, "images", "%d.png"%step), im)            
+        cv2.imwrite(os.path.join(out_dir, "traj_%d"%episode, "goal.png"), im)            
+        # Save the goal state 
+        goal_dict = get_step_dict(0, action_space.index(best_action), agent_state)
+        save_json(goal_dict, os.path.join(out_dir, "traj_%d"%episode, "goal.json"))
+
+
+
+
+
+if __name__=="__main__":
+    args = get_args()
+    out_dir = os.path.join(args.out_dir, args.scene_id.split("/")[-1][:-4])
+    collect_data(args, os.path.join(out_dir, "train"), seed=12) # collect training data 
+    collect_data(args, os.path.join(out_dir, "val"), seed=201) # collect validation data 
