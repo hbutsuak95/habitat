@@ -137,9 +137,9 @@ def euler_to_quaternion(yaw, pitch, roll):
 def get_step_dict(step, best_action, agent_state):
     step_dict = {}
     position, rot = agent_state.position, agent_state.rotation
-    step_dict["time"] = step; step_dict["action"] = best_action
-    step_dict["reward"] = 0; step_dict["done"] = 0; step_dict["state"] = {"position": position.tolist(),\
-     "rotation": [rot.x, rot.y, rot.z, rot.w]}
+    step_dict["time"] = step; step_dict["actions"] = best_action
+    step_dict["reward"] = 0; step_dict["done"] = 0; step_dict["pose"] = {"x": float(position[0]), 'y': float(position[1]), 'z': float(position[2]),\
+     "orientation.x": rot.x, "orientation.y": rot.y, "orientation.z": rot.z, "orientation.w": rot.w}
     return step_dict 
 
 def save_json(dict_, filename):
