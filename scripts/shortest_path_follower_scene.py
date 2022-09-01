@@ -143,8 +143,8 @@ def get_step_dict(step, best_action, agent_state):
     step_dict = {}
     position, rot = agent_state.position, agent_state.rotation
     step_dict["time"] = step; step_dict["actions"] = {'motion': best_action}
-    step_dict["reward"] = 0; step_dict["done"] = 0; step_dict["pose"] = {"x": float(position[0]), 'y': float(position[1]), 'z': float(position[2]),\
-     "orientation.x": rot.x, "orientation.y": rot.y, "orientation.z": rot.z, "orientation.w": rot.w}
+    step_dict["reward"] = 0; step_dict["done"] = 0; step_dict["pose"] = {"x": float(position[0]), 'y': float(position[2]), 'z': float(position[1]),\
+     "orientation.x": rot.x, "orientation.y": rot.z, "orientation.z": rot.y, "orientation.w": rot.w}
     return step_dict 
 
 def save_json(dict_, filename):
@@ -227,5 +227,4 @@ def collect_data(args, out_dir, seed=42):
 if __name__=="__main__":
     args = get_args()
     out_dir = os.path.join(args.out_dir, args.scene_id.split("/")[-1][:-4])
-    collect_data(args, os.path.join(out_dir, "train"), seed=12) # collect training data 
-    collect_data(args, os.path.join(out_dir, "val"), seed=201) # collect validation data 
+    collect_data(args, out_dir, seed=12) # collect training data 
