@@ -55,7 +55,7 @@ def get_args():
 
 
 
-def simulator_settings(rgb_sensor=True, depth_sensor=True):
+def simulator_settings(rgb_sensor=True, depth_sensor=False):
 
     sim_settings = {
         "width": 256,  # Spatial resolution of the observations
@@ -137,7 +137,7 @@ def euler_to_quaternion(yaw, pitch, roll):
 def get_step_dict(step, best_action, agent_state):
     step_dict = {}
     position, rot = agent_state.position, agent_state.rotation
-    step_dict["time"] = step; step_dict["actions"] = best_action
+    step_dict["time"] = step; step_dict["actions"] = {'motion': best_action}
     step_dict["reward"] = 0; step_dict["done"] = 0; step_dict["pose"] = {"x": float(position[0]), 'y': float(position[1]), 'z': float(position[2]),\
      "orientation.x": rot.x, "orientation.y": rot.y, "orientation.z": rot.z, "orientation.w": rot.w}
     return step_dict 
@@ -194,7 +194,7 @@ def collect_data(args, out_dir, seed=42):
             img_path = os.path.join(out_dir, "traj_%d"%episode, "images", "%d.png"%step)
             os.path.join(out_dir, "traj_%d"%episode, "meta", "%d.json"%step)
             im = obs["color_sensor"]
-            cv2.imwrite(img_path, im)
+            cv2.imwrite(img_path, im[:,:,:3])
 
             agent_state = agent.get_state()
             best_action = follower.next_action_along(goal_state.position)
@@ -207,8 +207,8 @@ def collect_data(args, out_dir, seed=42):
         # Save the last point in the trajectory as last step data and goal image
         im = obs["color_sensor"]
         agent_state = agent.get_state()
-        cv2.imwrite(os.path.join(out_dir, "traj_%d"%episode, "images", "%d.png"%step), im)            
-        cv2.imwrite(os.path.join(out_dir, "traj_%d"%episode, "goal.png"), im)            
+        cv2.imwrite(os.path.join(out_dir, "traj_%d"%episode, "images", "%d.png"%step), im[:,:,:3])            
+        cv2.imwrite(os.path.join(out_dir, "traj_%d"%episode, "goal.png"), im[:,:,:3])            
         # Save the goal state 
         goal_dict = get_step_dict(0, action_space.index(best_action), agent_state)
         save_json(goal_dict, os.path.join(out_dir, "traj_%d"%episode, "goal.json"))
