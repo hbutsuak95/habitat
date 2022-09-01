@@ -50,6 +50,11 @@ def get_args():
     	type=int,
     	default=128,
     	help="maximum steps allowed per episode")
+    parser.add_argument(
+        "--step_thresh",
+        type=int,
+        default=10,
+        help="minimum trajectory length to consider an episode valid")
     args = parser.parse_args()
     return args
 
@@ -212,7 +217,9 @@ def collect_data(args, out_dir, seed=42):
         # Save the goal state 
         goal_dict = get_step_dict(0, action_space.index(best_action), agent_state)
         save_json(goal_dict, os.path.join(out_dir, "traj_%d"%episode, "goal.json"))
-
+        # Rejects trajectories of length smaller than a given threshold 
+        if step < args.step_thresh: 
+            os.system("rm -rf %s"%os.path.join(out_dir, "traj_%d"%episode))
 
 
 
