@@ -51,10 +51,30 @@ def get_args():
     	default=128,
     	help="maximum steps allowed per episode")
     parser.add_argument(
+        "--min_steps",
+        type=int,
+        default=5,
+        help="minimum steps allowed per episode")
+    parser.add_argument(
         "--step_thresh",
         type=int,
         default=10,
         help="minimum trajectory length to consider an episode valid")
+    parser.add_argument(
+        "--linear_speed",
+        type=float,
+        default=0.25,
+        help="linear speed / forward step size (in meters)")
+    parser.add_argument(
+        "--angular_speed",
+        type=float,
+        default=5.0,
+        help="angular speed / left or right step size (in degrees) ")
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="set seed for random events and reproducibility")
     args = parser.parse_args()
     return args
 
@@ -72,6 +92,8 @@ def simulator_settings(rgb_sensor=True, depth_sensor=False):
         "depth_sensor": depth_sensor,  # Depth sensor
         "seed": 1,  # used in the random navigation
         "enable_physics": False,  # kinematics only
+        "linear_speed": args.linear_speed,
+        "angular_speed": args.angular_speed
     }
     return sim_settings
 
@@ -111,13 +133,13 @@ def make_cfg(settings):
     agent_cfg.sensor_specifications = sensor_specs
     agent_cfg.action_space = {
         "move_forward": habitat_sim.agent.ActionSpec(
-            "move_forward", habitat_sim.agent.ActuationSpec(amount=0.25)
+            "move_forward", habitat_sim.agent.ActuationSpec(amount=settings["linear_speed"])
         ),
         "turn_left": habitat_sim.agent.ActionSpec(
-            "turn_left", habitat_sim.agent.ActuationSpec(amount=15.0)
+            "turn_left", habitat_sim.agent.ActuationSpec(amount=settings["angular_speed"])
         ),
         "turn_right": habitat_sim.agent.ActionSpec(
-            "turn_right", habitat_sim.agent.ActuationSpec(amount=15.0)
+            "turn_right", habitat_sim.agent.ActuationSpec(amount=settings["angular_speed"])
         ),
     }
     
@@ -224,9 +246,85 @@ def collect_data(args, out_dir, seed=42):
             os.system("rm -rf %s"%os.path.join(out_dir, "traj_%d"%episode))
 
 
+def S1_fixed(args, out_dir, seed=42):
+    # Simulator specifications 
+    sim_settings = simulator_settings()
+
+    # setting up the simulator 
+    cfg = make_cfg(sim_settings)
+    sim = habitat_sim.Simulator(cfg)
+
+    # Initializing agent 
+    agent = sim.initialize_agent(sim_settings["default_agent"])
+
+    sim.seed(seed)
+    random.seed(seed)
+
+    action_space = [None] + list(cfg.agents[0].action_space.keys())
+
+    start_state = habitat_sim.AgentState()
+    # Sample a random navigable point as start state which will be fixed for every episode 
+    start_state.position = sim.pathfinder.get_random_navigable_point()
+
+    # Every episode starts from a random pose/orientation and ends after a random number of steps 
+    # the last step will count as the goal image/pose. 
+    for episode in tqdm.tqdm(range(args.num_episodes)):
+        # Reset the environment 
+        obs = sim.reset()
+        goal_state = habitat_sim.AgentState()
+        
+        # Randomly sample the rotations for start and goal states
+        start_state.rotation = euler_to_quaternion(0, random.randint(0,360), 0)
+        # goal_state.rotation = R.random().as_quat() # Not being used right now. 
+        
+        # Set the agent start state
+        agent = sim.initialize_agent(sim_settings["default_agent"])
+        agent.set_state(start_state)
+        
+        # Creating directories 
+        try:
+            os.system("mkdir -p %s"%os.path.join(out_dir, "traj_%d"%episode, "images"))
+            os.system("mkdir -p %s"%os.path.join(out_dir, "traj_%d"%episode, "meta"))
+        except:
+            pass
+        
+
+        # Randomly select number of steps for the episode 
+        num_steps = random.randint(args.min_steps, int(360/args.angular_speed))
+
+        # Randomly select an action b/w left and right and keep executing 
+        best_action = random.choice(["turn_left", "turn_right"])
+
+        step = 0
+        while step < num_steps:
+
+            agent_state = agent.get_state()
+            step_dict = get_step_dict(step, action_space.index(best_action), agent_state)
+            save_json(step_dict, os.path.join(out_dir, "traj_%d"%episode, "meta", "%d.json"%step))
+            obs = sim.step(best_action) 
+            img_path = os.path.join(out_dir, "traj_%d"%episode, "images", "%d.png"%step)
+            os.path.join(out_dir, "traj_%d"%episode, "meta", "%d.json"%step)
+            im = obs["color_sensor"][:,:,:3]
+            im = cv2.cvtColor(im,cv2.COLOR_RGB2BGR) # converting to BGR (as expected by the cv2.imwrite)
+            cv2.imwrite(img_path, im)
+
+            step+=1
+        # Save the last point in the trajectory as last step data and goal image
+        im = obs["color_sensor"][:,:,:3]
+        im = cv2.cvtColor(im,cv2.COLOR_RGB2BGR)
+        agent_state = agent.get_state()
+        cv2.imwrite(os.path.join(out_dir, "traj_%d"%episode, "goal.png"), im)            
+        # Save the goal state 
+        goal_dict = get_step_dict(0, action_space.index(best_action), agent_state)
+        save_json(goal_dict, os.path.join(out_dir, "traj_%d"%episode, "goal.json"))
+        # Rejects trajectories of length smaller than a given threshold 
+        if step < args.step_thresh: 
+            os.system("rm -rf %s"%os.path.join(out_dir, "traj_%d"%episode))
 
 
 if __name__=="__main__":
     args = get_args()
+    random.seed(args.seed)
+    np.random.seed(args.seed)
     out_dir = os.path.join(args.out_dir, args.scene_id.split("/")[-1][:-4])
-    collect_data(args, out_dir, seed=12) # collect training data 
+    S1_fixed(args, out_dir, seed=args.seed) # collect training data 
