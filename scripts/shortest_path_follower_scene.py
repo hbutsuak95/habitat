@@ -73,7 +73,7 @@ def get_args():
     parser.add_argument(
         "--seed",
         type=int,
-        default=42,
+        default=9211,
         help="set seed for random events and reproducibility")
     args = parser.parse_args()
     return args
