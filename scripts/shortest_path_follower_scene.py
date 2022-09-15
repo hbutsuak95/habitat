@@ -20,7 +20,7 @@ from habitat_sim.utils import viz_utils as vut
 import habitat
 from habitat.core.utils import try_cv2_import
 from habitat.tasks.nav.shortest_path_follower import ShortestPathFollower
-from habitat_sim.nav import GreedyGeodesicFollower
+from habitat_sim.nav import GreedyGeodesicFollower 
 from habitat.utils.visualizations import maps
 from habitat.utils.visualizations.utils import images_to_video
 
@@ -290,7 +290,7 @@ def S1_fixed(args, out_dir, seed=42):
         
 
         # Randomly select number of steps for the episode 
-        num_steps = random.randint(args.min_steps, int(360/args.angular_speed))
+        num_steps = random.randint(args.min_steps, min(int(360/args.angular_speed), args.max_steps))
 
         # Randomly select an action b/w left and right and keep executing 
         best_action = random.choice(["turn_left", "turn_right"])
