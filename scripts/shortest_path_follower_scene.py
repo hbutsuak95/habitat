@@ -157,6 +157,7 @@ def euler_to_quaternion(yaw, pitch, roll):
     qy = np.cos(roll/2) * np.sin(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.cos(pitch/2) * np.sin(yaw/2)
     qz = np.cos(roll/2) * np.cos(pitch/2) * np.sin(yaw/2) - np.sin(roll/2) * np.sin(pitch/2) * np.cos(yaw/2)
     qw = np.cos(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
+    print([qx, qy, qz, qw])
 
     return [qx, qy, qz, qw]
 
@@ -202,7 +203,7 @@ def collect_data(args, out_dir, seed=42):
         goal_state.position = sim.pathfinder.get_random_navigable_point()
         
         # Randomly sample the rotations for start and goal states
-        start_state.rotation = euler_to_quaternion(0, random.randint(0,360), 0)
+        start_state.rotation = euler_to_quaternion(0, random.randint(0, 360) * np.pi / 180, 0)
         # goal_state.rotation = R.random().as_quat() # Not being used right now. 
         
         # Set the agent start state
@@ -274,7 +275,7 @@ def S1_fixed(args, out_dir, seed=42):
         goal_state = habitat_sim.AgentState()
         
         # Randomly sample the rotations for start and goal states
-        start_state.rotation = euler_to_quaternion(0, random.randint(0,360), 0)
+        start_state.rotation = euler_to_quaternion(0, random.randint(0, 360) * np.pi / 180, 0)
         # goal_state.rotation = R.random().as_quat() # Not being used right now. 
         
         # Set the agent start state
