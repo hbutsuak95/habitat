@@ -230,11 +230,16 @@ def collect_data(args, out_dir, seed=42):
         except:
             pass
 
-        step = 0
+        step = 0;
         while step < args.max_steps:
-
+            flag = 0
             agent_state = agent.get_state()
-            best_action = follower.next_action_along(goal_state.position)
+            try:
+                best_action = follower.next_action_along(goal_state.position)
+            except:
+                os.system("rm -rf %s" % os.path.join(out_dir, "traj_%d" % episode))
+                flag = 1
+                break
             step_dict = get_step_dict(step, action_space.index(best_action), agent_state)
             save_json(step_dict, os.path.join(out_dir, "traj_%d" % episode, "meta", "%d.json" % step))
             if best_action is None:
@@ -249,6 +254,10 @@ def collect_data(args, out_dir, seed=42):
             obs = sim.step(best_action)
 
             step += 1
+
+        if flag == 1:
+            continue
+
         # Save the last point in the trajectory as last step data and goal image
         im = obs["color_sensor"][:, :, :3]
         im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
@@ -348,6 +357,7 @@ if __name__ == "__main__":
     random.seed(args.seed)
     np.random.seed(args.seed)
     out_dir = os.path.join(args.out_dir, args.scene_id.split("/")[-1][:-4])
-    S1_fixed(args, out_dir, seed=args.seed)  # Collect training data
+    # S1_fixed(args, out_dir, seed=args.seed)  # Collect training data
+    collect_data(args, out_dir, seed=args.seed)  # Collect training data
     split_data(split=args.split, path=out_dir)
     
