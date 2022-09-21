@@ -157,9 +157,9 @@ def euler_to_quaternion(yaw, pitch, roll):
     qy = np.cos(roll/2) * np.sin(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.cos(pitch/2) * np.sin(yaw/2)
     qz = np.cos(roll/2) * np.cos(pitch/2) * np.sin(yaw/2) - np.sin(roll/2) * np.sin(pitch/2) * np.cos(yaw/2)
     qw = np.cos(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
-    print([qx, qy, qz, qw])
 
-    return [qx, qy, qz, qw]
+    # return [qw, qx, qy, qz]
+    return np.quaternion(qw, qx, qy, qz)
 
 
 def get_step_dict(step, best_action, agent_state):
