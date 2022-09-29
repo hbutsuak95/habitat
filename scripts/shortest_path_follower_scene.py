@@ -232,13 +232,13 @@ def collect_data(args, out_dir, seed=42):
 
         step = 0;
         while step < args.max_steps:
-            flag = 0
+
             agent_state = agent.get_state()
             best_action = follower.next_action_along(goal_state.position)
+            if best_action is None:
+                raise Exception("Generating the data failed, try a different seed")
             step_dict = get_step_dict(step, action_space.index(best_action), agent_state)
             save_json(step_dict, os.path.join(out_dir, "traj_%d" % episode, "meta", "%d.json" % step))
-            if best_action is None:
-                break
             obs = sim.get_sensor_observations()
             img_path = os.path.join(out_dir, "traj_%d" % episode, "images", "%d.png" % step)
             os.path.join(out_dir, "traj_%d" % episode, "meta", "%d.json" % step)
@@ -249,9 +249,6 @@ def collect_data(args, out_dir, seed=42):
             obs = sim.step(best_action)
 
             step += 1
-
-        if flag == 1:
-            continue
 
         # Save the last point in the trajectory as last step data and goal image
         im = obs["color_sensor"][:, :, :3]
@@ -355,4 +352,4 @@ if __name__ == "__main__":
     # S1_fixed(args, out_dir, seed=args.seed)  # Collect training data
     collect_data(args, out_dir, seed=args.seed)  # Collect training data
     split_data(split=args.split, path=out_dir)
-    
+
