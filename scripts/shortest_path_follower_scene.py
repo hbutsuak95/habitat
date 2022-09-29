@@ -241,7 +241,6 @@ def collect_data(args, out_dir, seed=42):
                 if step > args.max_steps:
                     break
                 else:
-                    import ipdb; ipdb.set_trace()
                     goal_state.position = sim.pathfinder.get_random_navigable_point()
                     continue
 
