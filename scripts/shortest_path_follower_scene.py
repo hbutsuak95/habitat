@@ -219,28 +219,36 @@ def collect_data(args, out_dir, seed=42):
         step = 0
         while step < args.max_steps:
 
-            agent_state = agent.get_state()
             best_action = follower.next_action_along(goal_state.position)
-            step_dict = get_step_dict(step, action_space.index(best_action), agent_state)
-            save_json(step_dict, os.path.join(out_dir, "traj_%d"%episode, "meta", "%d.json"%step))
             if best_action is None:
                 break
-            obs = sim.step(best_action) 
+            obs = sim.step(best_action)  
+            agent_state = agent.get_state()  # this ignores the first state / start state becomes t=1 
+            step_dict = get_step_dict(step, action_space.index(best_action), agent_state)
+            save_json(step_dict, os.path.join(out_dir, "traj_%d"%episode, "meta", "%d.json"%step))
             img_path = os.path.join(out_dir, "traj_%d"%episode, "images", "%d.png"%step)
             os.path.join(out_dir, "traj_%d"%episode, "meta", "%d.json"%step)
-            im = obs["color_sensor"][:,:,:3]
-            im = cv2.cvtColor(im,cv2.COLOR_RGB2BGR) # converting to BGR (as expected by the cv2.imwrite)
+            im= obs["color_sensor"][:,:,:3]
+            im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
             cv2.imwrite(img_path, im)
+            #img_path = os.path.join(out_dir, "traj_%d"%episode, "images", "%d.png"%step)
+            #os.path.join(out_dir, "traj_%d"%episode, "meta", "%d.json"%step)
+            #im = obs["color_sensor"][:,:,:3]
+            #im = cv2.cvtColor(im,cv2.COLOR_RGB2BGR) # converting to BGR (as expected by the cv2.imwrite)
+            #cv2.imwrite(img_path, im)
 
             step+=1
         # Save the last point in the trajectory as last step data and goal image
         im = obs["color_sensor"][:,:,:3]
         im = cv2.cvtColor(im,cv2.COLOR_RGB2BGR)
         agent_state = agent.get_state()
-        cv2.imwrite(os.path.join(out_dir, "traj_%d"%episode, "goal.png"), im)            
+        cv2.imwrite(os.path.join(out_dir, "traj_%d"%episode, "goal.png"), im)
+        #cv2.imwrite(os.path.join(out_dir, "traj_%d"%episode, "images", "%d.png"%step), im)
         # Save the goal state 
         goal_dict = get_step_dict(0, action_space.index(best_action), agent_state)
+        #last_step_dict = get_step_dict(step, action_space.index(best_action), agent_state) 
         save_json(goal_dict, os.path.join(out_dir, "traj_%d"%episode, "goal.json"))
+        #save_json(last_step_dict, os.path.join(out_dir, "traj_%d"%episode, "meta", "%d.json"%step))
         # Rejects trajectories of length smaller than a given threshold 
         if step < args.step_thresh: 
             os.system("rm -rf %s"%os.path.join(out_dir, "traj_%d"%episode))
