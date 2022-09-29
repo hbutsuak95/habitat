@@ -238,7 +238,7 @@ def collect_data(args, out_dir, seed=42):
             best_action = follower.next_action_along(goal_state.position)
             if best_action is None:
                 # If we already have max
-                if step > args.max_steps:
+                if step > args.min_steps:
                     break
                 else:
                     goal_state.position = sim.pathfinder.get_random_navigable_point()
