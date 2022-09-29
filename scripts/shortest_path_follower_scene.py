@@ -237,7 +237,14 @@ def collect_data(args, out_dir, seed=42):
             agent_state = agent.get_state()
             best_action = follower.next_action_along(goal_state.position)
             if best_action is None:
-                break
+                # If we already have max
+                if step > args.max_steps:
+                    break
+                else:
+                    import ipdb; ipdb.set_trace()
+                    goal_state.position = sim.pathfinder.get_random_navigable_point()
+                    continue
+
             step_dict = get_step_dict(step, action_space.index(best_action), agent_state)
             save_json(step_dict, os.path.join(out_dir, "traj_%d" % episode, "meta", "%d.json" % step))
             obs = sim.get_sensor_observations()
@@ -312,7 +319,10 @@ def S1_fixed(args, out_dir, seed=42):
             pass
 
         # Randomly select number of steps for the episode
-        num_steps = random.randint(args.min_steps, min(int(360 / args.angular_speed), args.max_steps))
+        if int(360 / args.angular_speed) > args.min_steps:
+            num_steps = random.randint(args.min_steps, min(int(360 / args.angular_speed), args.max_steps))
+        else:
+            num_steps = random.randint(args.min_steps, args.max_steps)
 
         # Randomly select an action b/w left and right and keep executing 
         best_action = random.choice(["turn_left", "turn_right"])
