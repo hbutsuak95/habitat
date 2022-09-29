@@ -195,6 +195,7 @@ def collect_data(args, out_dir, seed=42):
 
     # Initializing agent and the greedy Geodesic follower policy 
     agent = sim.initialize_agent(sim_settings["default_agent"])
+    # follower = ShortestPathFollower(sim, 0.25, False)
     follower = GreedyGeodesicFollower(sim.pathfinder, agent, goal_radius=0.25)
 
     sim.seed(seed)
@@ -236,7 +237,7 @@ def collect_data(args, out_dir, seed=42):
             agent_state = agent.get_state()
             best_action = follower.next_action_along(goal_state.position)
             if best_action is None:
-                raise Exception("Generating the data failed, try a different seed")
+                break
             step_dict = get_step_dict(step, action_space.index(best_action), agent_state)
             save_json(step_dict, os.path.join(out_dir, "traj_%d" % episode, "meta", "%d.json" % step))
             obs = sim.get_sensor_observations()
@@ -251,6 +252,7 @@ def collect_data(args, out_dir, seed=42):
             step += 1
 
         # Save the last point in the trajectory as last step data and goal image
+        obs = sim.get_sensor_observations()
         im = obs["color_sensor"][:, :, :3]
         im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
         agent_state = agent.get_state()
