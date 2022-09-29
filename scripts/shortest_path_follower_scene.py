@@ -234,12 +234,7 @@ def collect_data(args, out_dir, seed=42):
         while step < args.max_steps:
             flag = 0
             agent_state = agent.get_state()
-            try:
-                best_action = follower.next_action_along(goal_state.position)
-            except:
-                os.system("rm -rf %s" % os.path.join(out_dir, "traj_%d" % episode))
-                flag = 1
-                break
+            best_action = follower.next_action_along(goal_state.position)
             step_dict = get_step_dict(step, action_space.index(best_action), agent_state)
             save_json(step_dict, os.path.join(out_dir, "traj_%d" % episode, "meta", "%d.json" % step))
             if best_action is None:
