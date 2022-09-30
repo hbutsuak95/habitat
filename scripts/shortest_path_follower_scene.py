@@ -6,6 +6,7 @@ import json
 
 import cv2
 import imageio
+import ipdb
 import numpy as np
 import argparse
 import tqdm
@@ -235,9 +236,17 @@ def collect_data(args, out_dir, seed=42):
         while step < args.max_steps:
 
             agent_state = agent.get_state()
-            best_action = follower.next_action_along(goal_state.position)
+            try:
+                # https://github.com/facebookresearch/habitat-sim/issues/410
+                best_action = follower.next_action_along(goal_state.position)
+            except:
+                # Pathfinder can fail, sample new goal position and continue
+                goal_state.position = sim.pathfinder.get_random_navigable_point()
+                print("Resampling new goal as follower failed")
+                continue
+            # If the goal was reached but min number of steps is not reached, start again
             if best_action is None:
-                # If we already have max
+                # If we already have min number of steps break
                 if step > args.min_steps:
                     break
                 else:
@@ -363,4 +372,3 @@ if __name__ == "__main__":
     # S1_fixed(args, out_dir, seed=args.seed)  # Collect training data
     collect_data(args, out_dir, seed=args.seed)  # Collect training data
     split_data(split=args.split, path=out_dir)
-
